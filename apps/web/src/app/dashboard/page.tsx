@@ -18,6 +18,7 @@ import {
 import { useRequireAuth } from "@/utils/auth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { LocationModalWrapper } from "@/components/LocationModalWrapper";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -215,80 +216,83 @@ export default function DashboardPage() {
     ];
 
     return (
-      <DashboardLayout title="Dashboard">
-        <div
-          className={`transition-opacity duration-500 ${
-            mounted ? "opacity-100" : "opacity-0"
-          }`}
-        >
-          {/* Debug Links (only in development) */}
-          {process.env.NODE_ENV === "development" && (
-            <div className="mb-4 p-2 bg-yellow-50 rounded-lg border border-yellow-200 text-sm">
-              <p>Debug Mode: Authenticated as {user?.name}</p>
-              <div className="flex space-x-4 mt-2">
-                <Link
-                  href="/debug-dashboard"
-                  className="text-blue-600 hover:underline"
-                >
-                  Debug Page
-                </Link>
-                <Link
-                  href="/simple-dashboard"
-                  className="text-blue-600 hover:underline"
-                >
-                  Simple Dashboard
-                </Link>
+      <>
+        <DashboardLayout title="Dashboard">
+          <div
+            className={`transition-opacity duration-500 ${
+              mounted ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            {/* Debug Links (only in development) */}
+            {process.env.NODE_ENV === "development" && (
+              <div className="mb-4 p-2 bg-yellow-50 rounded-lg border border-yellow-200 text-sm">
+                <p>Debug Mode: Authenticated as {user?.name}</p>
+                <div className="flex space-x-4 mt-2">
+                  <Link
+                    href="/debug-dashboard"
+                    className="text-blue-600 hover:underline"
+                  >
+                    Debug Page
+                  </Link>
+                  <Link
+                    href="/simple-dashboard"
+                    className="text-blue-600 hover:underline"
+                  >
+                    Simple Dashboard
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* Clock Section */}
+            <div className="mb-6">
+              <Clock className="animate-fadeIn" />
+            </div>
+
+            {/* Stats Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              {stats.map((stat, index) => (
+                <StatCard
+                  key={index}
+                  title={stat.title}
+                  value={stat.value}
+                  icon={stat.icon}
+                  trend={stat.trend}
+                  className="animate-fadeIn"
+                  style={{ animationDelay: `${index * 100}ms` }}
+                />
+              ))}
+            </div>
+
+            {/* Main Content */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column */}
+              <div className="lg:col-span-2 space-y-6">
+                <ActivityList
+                  activities={activities}
+                  className="animate-fadeIn"
+                  style={{ animationDelay: "400ms" }}
+                />
+                <TimeDistributionChart
+                  data={timeDistribution}
+                  className="animate-fadeIn"
+                  style={{ animationDelay: "500ms" }}
+                />
+              </div>
+
+              {/* Right Column */}
+              <div className="space-y-6">
+                <ProjectList
+                  projects={projects}
+                  className="animate-fadeIn"
+                  style={{ animationDelay: "600ms" }}
+                />
               </div>
             </div>
-          )}
-
-          {/* Clock Section */}
-          <div className="mb-6">
-            <Clock className="animate-fadeIn" />
           </div>
-
-          {/* Stats Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {stats.map((stat, index) => (
-              <StatCard
-                key={index}
-                title={stat.title}
-                value={stat.value}
-                icon={stat.icon}
-                trend={stat.trend}
-                className="animate-fadeIn"
-                style={{ animationDelay: `${index * 100}ms` }}
-              />
-            ))}
-          </div>
-
-          {/* Main Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column */}
-            <div className="lg:col-span-2 space-y-6">
-              <ActivityList
-                activities={activities}
-                className="animate-fadeIn"
-                style={{ animationDelay: "400ms" }}
-              />
-              <TimeDistributionChart
-                data={timeDistribution}
-                className="animate-fadeIn"
-                style={{ animationDelay: "500ms" }}
-              />
-            </div>
-
-            {/* Right Column */}
-            <div className="space-y-6">
-              <ProjectList
-                projects={projects}
-                className="animate-fadeIn"
-                style={{ animationDelay: "600ms" }}
-              />
-            </div>
-          </div>
-        </div>
-      </DashboardLayout>
+        </DashboardLayout>
+        <LocationModalWrapper />
+      </>
     );
   } catch (err) {
     setError(

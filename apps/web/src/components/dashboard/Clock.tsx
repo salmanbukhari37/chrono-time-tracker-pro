@@ -1,5 +1,8 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import { FaClock, FaPlay, FaPause, FaStop } from "react-icons/fa";
+import { useLocationPermission } from "@/hooks/useLocationPermission";
 
 interface ClockProps {
   className?: string;
@@ -11,6 +14,10 @@ export const Clock: React.FC<ClockProps> = ({ className = "" }) => {
   const [checkInTime, setCheckInTime] = useState<Date | null>(null);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [locationDenied, setLocationDenied] = useState(false);
+
+  const { hasPermission, handleLocationGranted, handleLocationDenied } =
+    useLocationPermission();
 
   // Update current time every second
   useEffect(() => {
@@ -36,6 +43,13 @@ export const Clock: React.FC<ClockProps> = ({ className = "" }) => {
   }, [isCheckedIn, isPaused, checkInTime]);
 
   const handleCheckIn = () => {
+    if (hasPermission !== true) {
+      navigator.geolocation.getCurrentPosition(
+        handleLocationGranted,
+        handleLocationDenied
+      );
+      return;
+    }
     const now = new Date();
     setCheckInTime(now);
     setIsCheckedIn(true);
@@ -44,10 +58,24 @@ export const Clock: React.FC<ClockProps> = ({ className = "" }) => {
   };
 
   const handlePause = () => {
+    if (hasPermission !== true) {
+      navigator.geolocation.getCurrentPosition(
+        handleLocationGranted,
+        handleLocationDenied
+      );
+      return;
+    }
     setIsPaused(!isPaused);
   };
 
   const handleCheckOut = () => {
+    if (hasPermission !== true) {
+      navigator.geolocation.getCurrentPosition(
+        handleLocationGranted,
+        handleLocationDenied
+      );
+      return;
+    }
     setIsCheckedIn(false);
     setCheckInTime(null);
     setElapsedTime(0);
@@ -74,6 +102,26 @@ export const Clock: React.FC<ClockProps> = ({ className = "" }) => {
 
   return (
     <div className={`bg-white rounded-lg shadow-sm p-6 ${className}`}>
+      {/* Location Denied Notification */}
+      {locationDenied && (
+        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg w-full">
+          <p className="text-sm text-red-800">
+            ⚠️ Location access has been denied. Some features may be limited.{" "}
+            <button
+              onClick={() =>
+                navigator.geolocation.getCurrentPosition(
+                  handleLocationGranted,
+                  handleLocationDenied
+                )
+              }
+              className="text-primary-600 hover:underline font-medium"
+            >
+              Enable Location
+            </button>
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-col items-center space-y-4">
         {/* Current Time Display */}
         <div className="text-4xl font-bold text-gray-800 font-mono">
@@ -159,6 +207,27 @@ export const Clock: React.FC<ClockProps> = ({ className = "" }) => {
             </>
           )}
         </div>
+
+        {/* Location Warning */}
+        {hasPermission === false && (
+          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg w-full">
+            <p className="text-sm text-yellow-800">
+              ⚠️ Location access is required for time tracking. Some features
+              may be limited.{" "}
+              <button
+                onClick={() =>
+                  navigator.geolocation.getCurrentPosition(
+                    handleLocationGranted,
+                    handleLocationDenied
+                  )
+                }
+                className="text-primary-600 hover:underline font-medium"
+              >
+                Enable Location
+              </button>
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
