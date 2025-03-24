@@ -21,7 +21,9 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@reduxjs/toolkit": "^2.6.1",
     "@types/jsonwebtoken": "^9.0.9",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "react-redux": "^9.2.0"
   }
 }

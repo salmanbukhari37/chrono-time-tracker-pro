@@ -4,3 +4,4 @@ export * from "./ActivityList";
 export * from "./ProjectList";
 export * from "./TimeDistributionChart";
 export * from "./Clock";
+export * from "./timeEntries/TimeEntriesHistory";

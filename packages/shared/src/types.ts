@@ -7,6 +7,9 @@ export interface TimeEntry {
   projectId?: string;
   tags?: string[];
   userId: string;
+  checkInNotes?: string;
+  checkOutNotes?: string;
+  breakTime?: number; // Total break time in milliseconds
 }
 
 export interface Project {

@@ -14,11 +14,13 @@ import {
   ProjectList,
   TimeDistributionChart,
   Clock,
+  TimeEntriesHistory,
 } from "@/components/dashboard";
 import { useRequireAuth } from "@/utils/auth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LocationModalWrapper } from "@/components/LocationModalWrapper";
+import { useTimeEntries } from "@/hooks/useTimeEntries";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -26,6 +28,7 @@ export default function DashboardPage() {
   const { user, isAuthenticated, isLoading } = useRequireAuth();
   const [error, setError] = useState<string | null>(null);
   const [renderStage, setRenderStage] = useState("initial");
+  const { timeEntries } = useTimeEntries(user?.id || "user-1");
 
   useEffect(() => {
     try {
@@ -246,7 +249,7 @@ export default function DashboardPage() {
 
             {/* Clock Section */}
             <div className="mb-6">
-              <Clock className="animate-fadeIn" />
+              <Clock className="animate-fadeIn" userId={user?.id || "user-1"} />
             </div>
 
             {/* Stats Section */}
@@ -286,6 +289,13 @@ export default function DashboardPage() {
                   projects={projects}
                   className="animate-fadeIn"
                   style={{ animationDelay: "600ms" }}
+                />
+
+                {/* Time Entries History */}
+                <TimeEntriesHistory
+                  timeEntries={timeEntries}
+                  className="animate-fadeIn"
+                  style={{ animationDelay: "700ms" }}
                 />
               </div>
             </div>

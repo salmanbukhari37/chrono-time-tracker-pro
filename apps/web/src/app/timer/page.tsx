@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import Timer from "@/components/Timer";
-import { TimeEntry } from "shared";
+import { useAppDispatch, useAppSelector } from "@/hooks/redux";
+import { addTimeEntry } from "@/store/features/timeEntriesSlice";
 import { generateId } from "shared";
 import { formatDate, formatDuration } from "shared";
 
 export default function TimerPage() {
-  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
+  const dispatch = useAppDispatch();
+  const timeEntries = useAppSelector((state) => state.timeEntries.entries);
 
   const handleSaveTimeEntry = (
     duration: number,
@@ -16,18 +18,20 @@ export default function TimerPage() {
     description: string
   ) => {
     const now = new Date();
-    const startTime = new Date(now.getTime() - duration);
+    const startTime = new Date(now.getTime() - duration).toISOString();
+    const endTime = now.toISOString();
 
-    const newEntry: TimeEntry = {
+    const newEntry = {
       id: generateId(),
       title,
       description,
       startTime,
-      endTime: now,
+      endTime,
       userId: "user-1", // In a real app, this would come from authentication
+      breaks: [],
     };
 
-    setTimeEntries([newEntry, ...timeEntries]);
+    dispatch(addTimeEntry(newEntry)); // Dispatch action to add time entry
   };
 
   return (
@@ -58,7 +62,8 @@ export default function TimerPage() {
                     <span className="text-gray-600">
                       {entry.endTime &&
                         formatDuration(
-                          entry.endTime.getTime() - entry.startTime.getTime()
+                          new Date(entry.endTime).getTime() -
+                            new Date(entry.startTime).getTime()
                         )}
                     </span>
                   </div>
@@ -68,8 +73,8 @@ export default function TimerPage() {
                     </p>
                   )}
                   <div className="text-xs text-gray-500 mt-2">
-                    {formatDate(entry.startTime)} -{" "}
-                    {entry.endTime && formatDate(entry.endTime)}
+                    {formatDate(new Date(entry.startTime))} -{" "}
+                    {entry.endTime && formatDate(new Date(entry.endTime))}
                   </div>
                 </div>
               ))}
