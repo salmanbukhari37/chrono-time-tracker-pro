@@ -9,6 +9,7 @@ interface NotesSectionProps {
   onCheckInNoteChange: (note: string) => void;
   onCheckOutNoteChange: (note: string) => void;
   onShowNotesChange: (show: boolean) => void;
+  onSaveNote: () => void;
 }
 
 const NotesSection: React.FC<NotesSectionProps> = ({
@@ -18,6 +19,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
   onCheckInNoteChange,
   onCheckOutNoteChange,
   onShowNotesChange,
+  onSaveNote,
 }) => {
   const noteInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -45,7 +47,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
             Cancel
           </button>
           <button
-            onClick={() => onShowNotesChange(false)}
+            onClick={onSaveNote}
             className="px-3 py-1 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600"
           >
             Save Note

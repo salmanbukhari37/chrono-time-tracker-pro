@@ -42,6 +42,7 @@ const timeEntriesSlice = createSlice({
       state,
       action: PayloadAction<{ userId: string; notes: string }>
     ) => {
+      console.log("Starting time entry with:", action.payload);
       const { userId, notes } = action.payload;
       state.currentEntry = {
         id: Date.now().toString(),
@@ -49,10 +50,12 @@ const timeEntriesSlice = createSlice({
         startTime: new Date().toISOString(),
         checkInNotes: notes,
         breaks: [],
-        title: "",
+        title: `Work Session - ${new Date().toLocaleDateString()}`,
+        description: notes,
       };
       state.isActive = true;
       state.isPaused = false;
+      console.log("Time entry started, state is now:", state);
     },
     pauseTimeEntry: (state) => {
       if (state.currentEntry) {

@@ -58,7 +58,9 @@ export const Clock: React.FC<ClockProps> = ({ className = "", userId }) => {
   };
 
   const handleCheckOut = () => {
-    dispatch(setShowNotes(true));
+    if (currentEntry) {
+      dispatch(completeTimeEntry(checkOutNote));
+    }
   };
 
   const handleSaveNote = () => {
@@ -87,6 +89,7 @@ export const Clock: React.FC<ClockProps> = ({ className = "", userId }) => {
         onCheckInNoteChange={(note) => dispatch(setCheckInNote(note))}
         onCheckOutNoteChange={(note) => dispatch(setCheckOutNote(note))}
         onShowNotesChange={(show) => dispatch(setShowNotes(show))}
+        onSaveNote={handleSaveNote}
       />
       <ActionButtons
         isActive={isActive}

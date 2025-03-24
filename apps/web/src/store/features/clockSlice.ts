@@ -40,6 +40,13 @@ const clockSlice = createSlice({
     setCheckOutNote: (state, action: PayloadAction<string>) => {
       state.checkOutNote = action.payload;
     },
+    setState: (
+      state,
+      action: PayloadAction<{ isActive: boolean; isPaused: boolean }>
+    ) => {
+      state.isActive = action.payload.isActive;
+      state.isPaused = action.payload.isPaused;
+    },
   },
 });
 
@@ -50,6 +57,7 @@ export const {
   setLocationDenied,
   setCheckInNote,
   setCheckOutNote,
+  setState,
 } = clockSlice.actions;
 
 export default clockSlice.reducer;
