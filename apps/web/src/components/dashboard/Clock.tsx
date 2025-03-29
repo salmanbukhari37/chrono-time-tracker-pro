@@ -48,8 +48,13 @@ export const Clock: React.FC<ClockProps> = ({ className = "", userId }) => {
     isPaused: timeEntriesIsPaused,
   } = useAppSelector((state) => state.timeEntries);
 
-  // Location permission
-  const { hasPermission } = useLocationPermission();
+  // Location permission with improved hook
+  const {
+    status: locationStatus,
+    hasPermission,
+    promptForLocation,
+    resetLocationStatus,
+  } = useLocationPermission();
 
   // Safe dispatch function to prevent infinite loops
   const safeDispatch = (action: any) => {
@@ -82,12 +87,15 @@ export const Clock: React.FC<ClockProps> = ({ className = "", userId }) => {
     }
   }, [timeEntriesIsActive, timeEntriesIsPaused, clockIsActive, clockIsPaused]);
 
-  // Update location denied state based on permission, but only for new clock-ins
+  // Update location denied state based on permission status
   useEffect(() => {
-    if (hasPermission !== null && !currentEntry) {
-      dispatch(setLocationDenied(!hasPermission));
+    // Only update if we have a valid status
+    if (locationStatus === "skipped" || locationStatus === "denied") {
+      dispatch(setLocationDenied(true));
+    } else if (locationStatus === "allowed") {
+      dispatch(setLocationDenied(false));
     }
-  }, [hasPermission, currentEntry, dispatch]);
+  }, [locationStatus, dispatch]);
 
   // Update notes when current entry changes
   useEffect(() => {
@@ -110,10 +118,18 @@ export const Clock: React.FC<ClockProps> = ({ className = "", userId }) => {
   }, [userId]);
 
   const handleCheckIn = () => {
-    // If location is denied and we're not already active, show the warning
-    if (!hasPermission && !currentEntry) {
-      dispatch(setLocationDenied(true));
-      return;
+    // If location is not allowed and we're not already active, enforce permission
+    if (locationStatus !== "allowed" && !currentEntry) {
+      // If skipped or denied, show warning
+      if (locationStatus === "skipped" || locationStatus === "denied") {
+        dispatch(setLocationDenied(true));
+        return;
+      }
+      // If unknown, prompt for location now
+      else if (locationStatus === "unknown") {
+        handleRequestLocation();
+        return;
+      }
     }
 
     if (checkInNote.trim()) {
@@ -142,16 +158,20 @@ export const Clock: React.FC<ClockProps> = ({ className = "", userId }) => {
 
   const handleSaveNote = () => {
     dispatch(setShowNotes(false));
+
     if (!clockIsActive && !clockIsPaused) {
-      if (!hasPermission && !currentEntry) {
+      // Starting a new time entry - check location permission
+      if (locationStatus !== "allowed" && !currentEntry) {
         dispatch(setLocationDenied(true));
         return;
       }
       dispatch(startTimeEntry({ userId, notes: checkInNote }));
     } else if (clockIsActive || clockIsPaused) {
       if (clockIsActive && !showNotes) {
+        // Just updating notes on current entry
         dispatch(updateCurrentEntryNotes(checkInNote));
       } else if (showNotes) {
+        // Completing the entry
         dispatch(completeTimeEntry(checkOutNote || ""));
         dispatch(setCheckOutNote(""));
         dispatch(setCheckInNote(""));
@@ -160,18 +180,14 @@ export const Clock: React.FC<ClockProps> = ({ className = "", userId }) => {
   };
 
   const handleRequestLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        () => {
-          dispatch(setLocationDenied(false));
-          localStorage.setItem("locationStatus", "allowed");
-        },
-        () => {
-          dispatch(setLocationDenied(true));
-          localStorage.setItem("locationStatus", "skipped");
-        }
-      );
-    }
+    // Use the improved promptForLocation function
+    promptForLocation()
+      .then(() => {
+        dispatch(setLocationDenied(false));
+      })
+      .catch(() => {
+        dispatch(setLocationDenied(true));
+      });
   };
 
   return (

@@ -6,15 +6,20 @@ import { useLocationPermission } from "@/hooks/useLocationPermission";
 
 export const LocationModalWrapper = () => {
   const [mounted, setMounted] = useState(false);
-  const { hasPermission, handleLocationGranted, handleLocationDenied } =
+  const { status, hasPermission, handleLocationGranted, handleLocationDenied } =
     useLocationPermission();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Don't render anything during SSR or if permission is already handled
-  if (!mounted || hasPermission !== null) {
+  // Don't render anything during SSR
+  if (!mounted) {
+    return null;
+  }
+
+  // Only show the modal if status is unknown (first-time user or reset)
+  if (status !== "unknown") {
     return null;
   }
 

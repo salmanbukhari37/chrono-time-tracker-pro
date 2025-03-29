@@ -24,9 +24,11 @@ import { useTimeEntries } from "@/hooks/useTimeEntries";
 import Loading from "@/components/common/Loading";
 import ErrorDisplay from "@/components/common/ErrorDisplay";
 import AuthRequired from "@/components/common/AuthRequired";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { selectDashboard } from "@/store/features/dashboardSlice"; // Fixed import path
 import { getIconComponent } from "@/utils/iconUtils"; // Import the utility function
+import { useLocationPermission } from "@/hooks/useLocationPermission";
+import { setLocationDenied } from "@/store/features/clockSlice";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -36,6 +38,10 @@ export default function DashboardPage() {
   const [renderStage, setRenderStage] = useState("initial");
   const { timeEntries } = useTimeEntries(user?.id || "user-1");
   const dashboard = useSelector(selectDashboard);
+  const dispatch = useDispatch();
+
+  // Get location status from hook
+  const { status: locationStatus } = useLocationPermission();
 
   // Map stats with icon components
   const statsWithIcons = dashboard.stats.map((stat) => ({
@@ -61,6 +67,17 @@ export default function DashboardPage() {
       );
     }
   }, [isAuthenticated, isLoading, router]);
+
+  // Set location status in redux store when page loads
+  useEffect(() => {
+    if (mounted) {
+      if (locationStatus === "skipped" || locationStatus === "denied") {
+        dispatch(setLocationDenied(true));
+      } else if (locationStatus === "allowed") {
+        dispatch(setLocationDenied(false));
+      }
+    }
+  }, [mounted, locationStatus, dispatch]);
 
   // If loading or not mounted yet, show a loading state
   if (isLoading || !mounted) {
@@ -103,6 +120,12 @@ export default function DashboardPage() {
                     className="text-blue-600 hover:underline"
                   >
                     Simple Dashboard
+                  </Link>
+                  <Link
+                    href="/test-location"
+                    className="text-blue-600 hover:underline"
+                  >
+                    Test Location Permissions
                   </Link>
                 </div>
               </div>
