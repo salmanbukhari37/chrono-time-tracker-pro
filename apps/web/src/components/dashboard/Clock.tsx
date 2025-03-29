@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useAppSelector, useAppDispatch } from "@/hooks/redux";
 import {
   setCheckInNote,
@@ -29,9 +29,12 @@ interface ClockProps {
 
 export const Clock: React.FC<ClockProps> = ({ className = "", userId }) => {
   const dispatch = useAppDispatch();
+  const isSyncingRef = useRef(false);
+
+  // Clock state
   const {
-    isActive,
-    isPaused,
+    isActive: clockIsActive,
+    isPaused: clockIsPaused,
     checkInNote,
     checkOutNote,
     showNotes,
@@ -48,32 +51,50 @@ export const Clock: React.FC<ClockProps> = ({ className = "", userId }) => {
   // Location permission
   const { hasPermission } = useLocationPermission();
 
-  // Ensure clock state and time entries state are always synced
+  // Safe dispatch function to prevent infinite loops
+  const safeDispatch = (action: any) => {
+    if (isSyncingRef.current) return;
+    isSyncingRef.current = true;
+    try {
+      dispatch(action);
+    } finally {
+      // Use setTimeout to break the synchronous call chain
+      setTimeout(() => {
+        isSyncingRef.current = false;
+      }, 0);
+    }
+  };
+
+  // Sync time entries -> clock (one way only, to prevent loops)
   useEffect(() => {
-    if (isActive !== timeEntriesIsActive || isPaused !== timeEntriesIsPaused) {
-      dispatch(
+    if (isSyncingRef.current) return;
+
+    if (
+      clockIsActive !== timeEntriesIsActive ||
+      clockIsPaused !== timeEntriesIsPaused
+    ) {
+      safeDispatch(
         setState({
           isActive: timeEntriesIsActive,
           isPaused: timeEntriesIsPaused,
         })
       );
     }
-  }, [timeEntriesIsActive, timeEntriesIsPaused, isActive, isPaused, dispatch]);
+  }, [timeEntriesIsActive, timeEntriesIsPaused, clockIsActive, clockIsPaused]);
 
-  // Update locationDenied state based on permission, but only for new clock-ins
+  // Update location denied state based on permission, but only for new clock-ins
   useEffect(() => {
-    // Only update if we have definitive permission info and we're not already active
     if (hasPermission !== null && !currentEntry) {
       dispatch(setLocationDenied(!hasPermission));
     }
-  }, [hasPermission, dispatch, currentEntry]);
+  }, [hasPermission, currentEntry, dispatch]);
 
   // Update notes when current entry changes
   useEffect(() => {
-    if (currentEntry && currentEntry.checkInNotes) {
-      dispatch(setCheckInNote(currentEntry.checkInNotes));
+    if (!isSyncingRef.current && currentEntry && currentEntry.checkInNotes) {
+      safeDispatch(setCheckInNote(currentEntry.checkInNotes));
     }
-  }, [currentEntry, dispatch]);
+  }, [currentEntry]);
 
   // Sync user data with localStorage
   useEffect(() => {
@@ -104,7 +125,7 @@ export const Clock: React.FC<ClockProps> = ({ className = "", userId }) => {
   };
 
   const handlePause = () => {
-    if (!isPaused) {
+    if (!clockIsPaused) {
       dispatch(pauseTimeEntry());
     } else {
       dispatch(resumeTimeEntry());
@@ -121,14 +142,14 @@ export const Clock: React.FC<ClockProps> = ({ className = "", userId }) => {
 
   const handleSaveNote = () => {
     dispatch(setShowNotes(false));
-    if (!isActive && !isPaused) {
+    if (!clockIsActive && !clockIsPaused) {
       if (!hasPermission && !currentEntry) {
         dispatch(setLocationDenied(true));
         return;
       }
       dispatch(startTimeEntry({ userId, notes: checkInNote }));
-    } else if (isActive || isPaused) {
-      if (isActive && !showNotes) {
+    } else if (clockIsActive || clockIsPaused) {
+      if (clockIsActive && !showNotes) {
         dispatch(updateCurrentEntryNotes(checkInNote));
       } else if (showNotes) {
         dispatch(completeTimeEntry(checkOutNote || ""));
@@ -158,7 +179,7 @@ export const Clock: React.FC<ClockProps> = ({ className = "", userId }) => {
       className={`bg-white rounded-lg shadow-md overflow-hidden ${className}`}
     >
       <ClockDisplay />
-      <StatusIndicator isActive={isActive} isPaused={isPaused} />
+      <StatusIndicator isActive={clockIsActive} isPaused={clockIsPaused} />
       <NotesSection
         showNotes={showNotes}
         checkInNote={checkInNote}
@@ -169,8 +190,8 @@ export const Clock: React.FC<ClockProps> = ({ className = "", userId }) => {
         onSaveNote={handleSaveNote}
       />
       <ActionButtons
-        isActive={isActive}
-        isPaused={isPaused}
+        isActive={clockIsActive}
+        isPaused={clockIsPaused}
         onCheckIn={handleCheckIn}
         onPause={handlePause}
         onCheckOut={handleCheckOut}
@@ -178,23 +199,22 @@ export const Clock: React.FC<ClockProps> = ({ className = "", userId }) => {
         locationDenied={locationDenied && !currentEntry} // Only disable button if no current entry
       />
       {/* Location Warning */}
-      {locationDenied &&
-        !currentEntry && ( // Only show warning if no current entry
-          <div className="px-4 pb-4">
-            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg w-full">
-              <p className="text-sm text-yellow-800">
-                ⚠️ Location access is required for time tracking. Some features
-                may be limited.{" "}
-                <button
-                  onClick={handleRequestLocation}
-                  className="text-blue-600 hover:underline font-medium"
-                >
-                  Enable Location
-                </button>
-              </p>
-            </div>
+      {locationDenied && !currentEntry && (
+        <div className="px-4 pb-4">
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg w-full">
+            <p className="text-sm text-yellow-800">
+              ⚠️ Location access is required for time tracking. Some features
+              may be limited.{" "}
+              <button
+                onClick={handleRequestLocation}
+                className="text-blue-600 hover:underline font-medium"
+              >
+                Enable Location
+              </button>
+            </p>
           </div>
-        )}
+        </div>
+      )}
     </div>
   );
 };

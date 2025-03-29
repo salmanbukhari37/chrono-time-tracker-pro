@@ -33,6 +33,20 @@ const getUserId = (): string | null => {
   return null;
 };
 
+// Helper function to safely convert string to Date
+const safeParseDate = (dateString: string | undefined): Date | undefined => {
+  if (!dateString) return undefined;
+  try {
+    const date = new Date(dateString);
+    // Check if the date is valid
+    if (isNaN(date.getTime())) return undefined;
+    return date;
+  } catch (e) {
+    console.error("Error parsing date:", e);
+    return undefined;
+  }
+};
+
 // Load initial state from localStorage
 const loadState = (): TimeEntriesState => {
   if (typeof window === "undefined") {
@@ -61,8 +75,8 @@ const loadState = (): TimeEntriesState => {
         const parsed = JSON.parse(savedEntries);
         entries = parsed.map((entry: any) => ({
           ...entry,
-          startTime: new Date(entry.startTime),
-          endTime: entry.endTime ? new Date(entry.endTime) : undefined,
+          startTime: safeParseDate(entry.startTime) || new Date(),
+          endTime: safeParseDate(entry.endTime),
         }));
       } catch (e) {
         console.error("Error parsing saved entries:", e);
@@ -78,19 +92,47 @@ const loadState = (): TimeEntriesState => {
     if (savedActiveEntry) {
       try {
         const parsed = JSON.parse(savedActiveEntry);
+
+        // Process breaks with extra validation
+        const breaks = Array.isArray(parsed.breaks)
+          ? parsed.breaks
+              .map((b: any) => {
+                // Ensure both start and end dates are valid if they exist
+                const startDate = safeParseDate(b.start);
+                const endDate = safeParseDate(b.end);
+
+                // Only include break if it has a valid start date
+                if (!startDate) return null;
+
+                return {
+                  start: startDate,
+                  end: endDate,
+                };
+              })
+              .filter(Boolean) // Remove any null entries
+          : [];
+
         currentEntry = {
           ...parsed,
-          startTime: new Date(parsed.startTime),
-          endTime: parsed.endTime ? new Date(parsed.endTime) : undefined,
-          breaks: parsed.breaks
-            ? parsed.breaks.map((b: any) => ({
-                start: new Date(b.start),
-                end: b.end ? new Date(b.end) : undefined,
-              }))
-            : [],
+          startTime: safeParseDate(parsed.startTime) || new Date(),
+          endTime: safeParseDate(parsed.endTime),
+          breaks,
         };
+
         isActive = parsed.status === "active";
         isPaused = parsed.status === "paused";
+
+        // Consistency check - if we're paused, there should be an ongoing break
+        if (isPaused && breaks.length > 0) {
+          const lastBreak = breaks[breaks.length - 1];
+          if (lastBreak.end) {
+            // The last break is completed, but we're still paused
+            // Add a new break starting now
+            breaks.push({
+              start: new Date(),
+            });
+          }
+        }
       } catch (e) {
         console.error("Error parsing active entry:", e);
       }
@@ -132,16 +174,22 @@ const saveState = (state: TimeEntriesState) => {
     // Save entries
     localStorage.setItem(timeEntriesKey, JSON.stringify(state.entries));
 
-    // Save active entry
+    // Save active entry with proper date handling
     if (state.currentEntry) {
       const status = state.isPaused ? "paused" : "active";
-      localStorage.setItem(
-        activeEntryKey,
-        JSON.stringify({
-          ...state.currentEntry,
-          status,
-        })
-      );
+
+      // Use a sanitized version of the current entry to avoid circular references
+      const sanitizedEntry = {
+        ...state.currentEntry,
+        status,
+        // Ensure breaks are properly formatted for serialization
+        breaks: state.currentEntry.breaks.map((b) => ({
+          start: b.start.toISOString(),
+          end: b.end ? b.end.toISOString() : undefined,
+        })),
+      };
+
+      localStorage.setItem(activeEntryKey, JSON.stringify(sanitizedEntry));
     } else {
       localStorage.removeItem(activeEntryKey);
     }
@@ -174,9 +222,12 @@ const timeEntriesSlice = createSlice({
     },
     pauseTimeEntry: (state) => {
       if (state.currentEntry) {
-        state.currentEntry.breaks.push({
-          start: new Date(),
-        });
+        // Add a new break only if we're not already paused
+        if (!state.isPaused) {
+          state.currentEntry.breaks.push({
+            start: new Date(),
+          });
+        }
         state.isPaused = true;
         state.isActive = false;
         saveState(state);
@@ -184,10 +235,12 @@ const timeEntriesSlice = createSlice({
     },
     resumeTimeEntry: (state) => {
       if (state.currentEntry && state.isPaused) {
-        const lastBreak =
-          state.currentEntry.breaks[state.currentEntry.breaks.length - 1];
-        if (lastBreak && !lastBreak.end) {
-          lastBreak.end = new Date();
+        if (state.currentEntry.breaks.length > 0) {
+          const lastBreak =
+            state.currentEntry.breaks[state.currentEntry.breaks.length - 1];
+          if (lastBreak && !lastBreak.end) {
+            lastBreak.end = new Date();
+          }
         }
         state.isPaused = false;
         state.isActive = true;
@@ -242,21 +295,28 @@ const timeEntriesSlice = createSlice({
       }
     },
     calculateTotalBreakTime: (state) => {
-      if (state.currentEntry) {
+      if (state.currentEntry && state.currentEntry.breaks) {
         const now = new Date();
-        const totalBreakTime = state.currentEntry.breaks.reduce(
-          (total, breakPeriod) => {
-            if (breakPeriod.end) {
-              return (
-                total +
-                (breakPeriod.end.getTime() - breakPeriod.start.getTime())
-              );
-            }
-            return total + (now.getTime() - breakPeriod.start.getTime());
-          },
-          0
-        );
-        state.totalBreakTime = totalBreakTime;
+        try {
+          const totalBreakTime = state.currentEntry.breaks.reduce(
+            (total, breakPeriod) => {
+              if (!breakPeriod.start) return total;
+
+              if (breakPeriod.end) {
+                return (
+                  total +
+                  (breakPeriod.end.getTime() - breakPeriod.start.getTime())
+                );
+              }
+              return total + (now.getTime() - breakPeriod.start.getTime());
+            },
+            0
+          );
+          state.totalBreakTime = totalBreakTime;
+        } catch (e) {
+          console.error("Error calculating break time:", e);
+          state.totalBreakTime = 0;
+        }
       }
     },
     addTimeEntry: (state, action: PayloadAction<TimeEntry>) => {
