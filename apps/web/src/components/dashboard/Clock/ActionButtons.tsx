@@ -10,6 +10,7 @@ interface ActionButtonsProps {
   onPause: () => void;
   onCheckOut: () => void;
   showNotes: boolean;
+  locationDenied: boolean;
 }
 
 const ActionButtons: React.FC<ActionButtonsProps> = ({
@@ -19,14 +20,17 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   onPause,
   onCheckOut,
   showNotes,
+  locationDenied,
 }) => {
   return (
     <div className="p-4 grid grid-cols-2 gap-3">
       {!isActive && !isPaused ? (
         <button
           onClick={onCheckIn}
-          className="col-span-2 flex items-center justify-center space-x-2 py-3 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors shadow-sm"
-          disabled={showNotes}
+          className={`col-span-2 flex items-center justify-center space-x-2 py-3 ${
+            locationDenied ? "bg-gray-400" : "bg-green-500 hover:bg-green-600"
+          } text-white rounded-md transition-colors shadow-sm`}
+          disabled={showNotes || locationDenied}
         >
           <FaPlay className="h-4 w-4" />
           <span className="font-medium">Clock In</span>

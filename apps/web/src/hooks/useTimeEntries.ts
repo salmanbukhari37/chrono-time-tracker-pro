@@ -1,6 +1,24 @@
-import { useState, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { TimeEntry } from "shared";
 import { generateId } from "shared";
+import {
+  startTimeEntry as startTimeEntryAction,
+  pauseTimeEntry as pauseTimeEntryAction,
+  resumeTimeEntry as resumeTimeEntryAction,
+  completeTimeEntry as completeTimeEntryAction,
+  updateCurrentEntryNotes as updateCurrentEntryNotesAction,
+  calculateTotalBreakTime,
+} from "../store/features/timeEntriesSlice";
+
+interface RootState {
+  timeEntries: {
+    currentEntry: TimeEntry | null;
+    entries: TimeEntry[];
+    isActive: boolean;
+    isPaused: boolean;
+    totalBreakTime: number;
+  };
+}
 
 type TimeEntryStatus = "active" | "paused" | "completed";
 
@@ -14,209 +32,63 @@ interface CurrentTimeEntry {
 }
 
 export const useTimeEntries = (userId: string) => {
-  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
-  const [currentEntry, setCurrentEntry] = useState<CurrentTimeEntry | null>(
-    null
-  );
+  const dispatch = useDispatch();
+  const {
+    currentEntry,
+    entries: timeEntries,
+    isActive,
+    isPaused,
+    totalBreakTime,
+  } = useSelector((state: RootState) => state.timeEntries);
 
-  // Load time entries from localStorage on mount
-  useEffect(() => {
-    const savedEntries = localStorage.getItem(`timeEntries_${userId}`);
-    if (savedEntries) {
-      try {
-        const parsed = JSON.parse(savedEntries);
-        // Convert string dates back to Date objects
-        const entries = parsed.map((entry: any) => ({
-          ...entry,
-          startTime: new Date(entry.startTime),
-          endTime: entry.endTime ? new Date(entry.endTime) : undefined,
-        }));
-        setTimeEntries(entries);
-      } catch (error) {
-        console.error("Error loading time entries from localStorage", error);
-      }
-    }
-
-    // Check for active entry
-    const activeEntry = localStorage.getItem(`activeTimeEntry_${userId}`);
-    if (activeEntry) {
-      try {
-        const parsed = JSON.parse(activeEntry);
-        setCurrentEntry({
-          ...parsed,
-          startTime: new Date(parsed.startTime),
-          breakPeriods: parsed.breakPeriods.map((period: any) => ({
-            start: new Date(period.start),
-            end: period.end ? new Date(period.end) : undefined,
-          })),
-        });
-      } catch (error) {
-        console.error(
-          "Error loading active time entry from localStorage",
-          error
-        );
-      }
-    }
-  }, [userId]);
-
-  // Save time entries to localStorage when they change
-  useEffect(() => {
-    if (timeEntries.length > 0) {
-      localStorage.setItem(
-        `timeEntries_${userId}`,
-        JSON.stringify(timeEntries)
-      );
-    }
-  }, [timeEntries, userId]);
-
-  // Save active entry to localStorage when it changes
-  useEffect(() => {
-    if (currentEntry) {
-      localStorage.setItem(
-        `activeTimeEntry_${userId}`,
-        JSON.stringify(currentEntry)
-      );
-    } else {
-      localStorage.removeItem(`activeTimeEntry_${userId}`);
-    }
-  }, [currentEntry, userId]);
-
-  const startTimeEntry = (checkInNotes?: string) => {
-    const newEntry: CurrentTimeEntry = {
-      id: generateId(),
-      startTime: new Date(),
-      checkInNotes,
-      breakPeriods: [],
-      status: "active",
-    };
-
-    setCurrentEntry(newEntry);
-    return newEntry;
+  const startTimeEntry = (checkInNotes: string = "") => {
+    dispatch(startTimeEntryAction({ userId, notes: checkInNotes }));
+    return currentEntry;
   };
 
   const pauseTimeEntry = () => {
-    if (!currentEntry) return null;
-
-    const updatedEntry: CurrentTimeEntry = {
-      ...currentEntry,
-      breakPeriods: [...currentEntry.breakPeriods, { start: new Date() }],
-      status: "paused",
-    };
-
-    setCurrentEntry(updatedEntry);
-    return updatedEntry;
+    dispatch(pauseTimeEntryAction());
+    return currentEntry;
   };
 
   const resumeTimeEntry = () => {
-    if (!currentEntry || currentEntry.status !== "paused") return null;
-
-    const updatedBreakPeriods = [...currentEntry.breakPeriods];
-    const lastBreak = updatedBreakPeriods[updatedBreakPeriods.length - 1];
-
-    if (lastBreak && !lastBreak.end) {
-      lastBreak.end = new Date();
-    }
-
-    const updatedEntry: CurrentTimeEntry = {
-      ...currentEntry,
-      breakPeriods: updatedBreakPeriods,
-      status: "active",
-    };
-
-    setCurrentEntry(updatedEntry);
-    return updatedEntry;
+    dispatch(resumeTimeEntryAction());
+    return currentEntry;
   };
 
-  const completeTimeEntry = (checkOutNotes?: string) => {
-    if (!currentEntry) return null;
-
-    // Ensure all breaks are properly ended
-    const updatedBreakPeriods = [...currentEntry.breakPeriods];
-    const lastBreak = updatedBreakPeriods[updatedBreakPeriods.length - 1];
-
-    if (lastBreak && !lastBreak.end && currentEntry.status === "paused") {
-      lastBreak.end = new Date();
-    }
-
-    // Calculate total break time
-    const totalBreakTime = updatedBreakPeriods.reduce((total, period) => {
-      if (!period.end) return total;
-      return total + (period.end.getTime() - period.start.getTime());
-    }, 0);
-
-    // Create the completed time entry
-    const completedEntry: TimeEntry = {
-      id: currentEntry.id,
-      title: "Time Entry", // This could be customizable
-      startTime: currentEntry.startTime,
-      endTime: new Date(),
-      userId,
-      checkInNotes: currentEntry.checkInNotes,
-      checkOutNotes,
-      breakTime: totalBreakTime,
-    };
-
-    setTimeEntries((prev) => [completedEntry, ...prev]);
-    setCurrentEntry(null);
-
-    return completedEntry;
+  const completeTimeEntry = (checkOutNotes: string = "") => {
+    dispatch(completeTimeEntryAction(checkOutNotes));
+    return currentEntry;
   };
 
-  const updateCurrentEntryNotes = (checkInNotes?: string) => {
-    if (!currentEntry) return null;
-
-    const updatedEntry: CurrentTimeEntry = {
-      ...currentEntry,
-      checkInNotes,
-    };
-
-    setCurrentEntry(updatedEntry);
-    return updatedEntry;
+  const updateCurrentEntryNotes = (checkInNotes: string = "") => {
+    dispatch(updateCurrentEntryNotesAction(checkInNotes));
+    return currentEntry;
   };
 
   const calculateElapsedTime = (): number => {
     if (!currentEntry) return 0;
 
     const now = new Date();
-    const rawElapsed = now.getTime() - currentEntry.startTime.getTime();
+    const startTime = new Date(currentEntry.startTime);
+    const rawElapsed = now.getTime() - startTime.getTime();
 
-    // Calculate break time
-    const breakTime = currentEntry.breakPeriods.reduce((total, period) => {
-      if (!period.end && currentEntry.status === "paused") {
-        // Ongoing break
-        return total + (now.getTime() - period.start.getTime());
-      } else if (period.end) {
-        // Completed break
-        return total + (period.end.getTime() - period.start.getTime());
-      }
-      return total;
-    }, 0);
-
-    return rawElapsed - breakTime;
+    // Calculate break time using the Redux state
+    dispatch(calculateTotalBreakTime());
+    return rawElapsed - totalBreakTime;
   };
 
   const getTotalBreakTime = (): number => {
     if (!currentEntry) return 0;
-
-    const now = new Date();
-
-    return currentEntry.breakPeriods.reduce((total, period) => {
-      if (!period.end && currentEntry.status === "paused") {
-        // Ongoing break
-        return total + (now.getTime() - period.start.getTime());
-      } else if (period.end) {
-        // Completed break
-        return total + (period.end.getTime() - period.start.getTime());
-      }
-      return total;
-    }, 0);
+    dispatch(calculateTotalBreakTime());
+    return totalBreakTime;
   };
 
   return {
     timeEntries,
     currentEntry,
-    isActive: !!currentEntry && currentEntry.status === "active",
-    isPaused: !!currentEntry && currentEntry.status === "paused",
+    isActive,
+    isPaused,
     startTimeEntry,
     pauseTimeEntry,
     resumeTimeEntry,
